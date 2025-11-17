@@ -135,6 +135,10 @@ class CourseStart extends Component
         });
     }
 
+    public function startQuiz($quizId)
+    {
+        return redirect()->route('student.quiz.start', $quizId);
+    }
     public function render()
     {
         return view('livewire.student.course-start');

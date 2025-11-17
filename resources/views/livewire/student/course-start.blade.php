@@ -3,77 +3,144 @@
     <!-- Improved sidebar and content layout to match Laravel structure -->
     <div class="flex h-[calc(100vh-57px)] overflow-hidden">
         <!-- Sidebar - Course Modules with Lessons -->
-        <aside id="course-sidebar"
-            class="sidebar w-80 bg-gray-100 overflow-y-auto fixed lg:static inset-y-0 left-0 z-40 lg:z-0 h-full">
+        <aside class="w-64 bg-white border-r overflow-y-auto hidden md:block">
             <div class="p-4">
-                @foreach ($modules as $index => $module)
-                    <!-- Module {{ $index + 1 }} -->
-                    <div class="mb-4">
-                        <h3 class="font-bold text-lg text-gray-900 mb-2">Section {{ $index + 1 }}:
-                            {{ $module->title }}</h3>
+                <div class="mb-4">
+                    <h2 class="font-bold text-gray-900 mb-2">Questions</h2>
+                    <p class="text-sm text-gray-600">Click on a question to navigate</p>
+                </div>
 
-                        <ul class="ml-3 space-y-1">
-                            @foreach ($module->lessons as $lessonIndex => $lesson)
-                                <li>
-                                    <button wire:click="selectLesson({{ $lesson->id }})"
-                                        class="lesson-btn w-full text-left py-2 px-3 rounded hover:bg-white transition-colors {{ $selectedLesson && $selectedLesson->id === $lesson->id ? 'text-primary font-semibold active-lesson' : 'text-gray-600 hover:underline' }}"
-                                        data-lesson="{{ $index * count($module->lessons) + $lessonIndex + 1 }}"
-                                        data-title="{{ $lesson->title }}"
-                                        data-duration="{{ $lesson->duration ?? '00:00' }}">
-                                        {{ $lesson->title }}
-                                    </button>
-                                </li>
-                            @endforeach
-                        </ul>
+                <div class="space-y-3">
+                    <div>
+                        <p class="text-xs font-semibold text-gray-500 mb-2 uppercase">Progress</p>
+                        <div class="flex items-center space-x-2 mb-3">
+                            <div class="flex-1 h-2 bg-gray-200 rounded-full overflow-hidden">
+                                @php
+                                    $totalQuestions = count($questions);
+                                    $answeredCount = count(array_filter($answers, fn($a) => !is_null($a)));
+                                    $progressPercentage =
+                                        $totalQuestions > 0 ? ($answeredCount / $totalQuestions) * 100 : 0;
+                                @endphp
+                                <div class="h-full bg-primary transition-all duration-300"
+                                    style="width: {{ $progressPercentage }}%"></div>
+                            </div>
+                            <span class="text-sm font-semibold text-gray-700">
+                                {{ $answeredCount }}/{{ $totalQuestions }}
+                            </span>
+                        </div>
                     </div>
-                @endforeach
+
+                    <div>
+                        <p class="text-xs font-semibold text-gray-500 mb-2 uppercase">Question List</p>
+                        <div class="grid grid-cols-5 gap-2">
+                            @foreach ($questions as $idx => $question)
+                                <button wire:click="goToQuestion({{ $idx }})"
+                                    class="w-10 h-10 rounded flex items-center justify-center text-sm font-medium transition-all hover:scale-105
+                            {{ $currentIndex === $idx
+                                ? 'bg-primary text-white border-2 border-primary'
+                                : (!is_null($answers[$idx] ?? null)
+                                    ? 'bg-green-100 border-2 border-green-600 text-green-700'
+                                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200') }}">
+                                    {{ $idx + 1 }}
+                                </button>
+                            @endforeach
+                        </div>
+                    </div>
+
+                    <div class="pt-3 border-t">
+                        <div class="flex items-center space-x-3 text-xs">
+                            <div class="flex items-center space-x-1">
+                                <div class="w-4 h-4 bg-primary rounded"></div>
+                                <span class="text-gray-600">Current</span>
+                            </div>
+                            <div class="flex items-center space-x-1">
+                                <div class="w-4 h-4 bg-green-100 border-2 border-green-600 rounded"></div>
+                                <span class="text-gray-600">Answered</span>
+                            </div>
+                            <div class="flex items-center space-x-1">
+                                <div class="w-4 h-4 bg-gray-100 rounded"></div>
+                                <span class="text-gray-600">Unanswered</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
             </div>
         </aside>
 
-        <!-- Main Content Area -->
-        <main class="flex-1 overflow-y-auto bg-white">
-            <div class="p-6">
-                <div id="lesson-content">
-                    @if ($selectedLesson)
-                        <!-- Dynamic lesson content will be loaded here -->
-                        <h1 class="text-2xl font-bold mb-3" id="lesson-title">{{ $selectedLesson->title }}</h1>
+        <!-- Main Content - Question Area -->
+        <main class="flex-1 overflow-y-auto p-6">
+            @if (count($questions) > 0)
+                @php $currentQuestion = $questions[$currentIndex]; @endphp
 
-                        <div class="prose max-w-none" id="lesson-body">
-                            {!! $selectedLesson->content !!}
+                <div class="max-w-3xl mx-auto">
+                    <!-- Question Header -->
+                    <div class="bg-white rounded-lg shadow-sm p-6 mb-6">
+                        <div class="flex items-center justify-between mb-4">
+                            <span class="text-sm font-semibold text-gray-500">
+                                Question {{ $currentIndex + 1 }} of {{ count($questions) }}
+                            </span>
+                            <span class="px-3 py-1 bg-blue-100 text-blue-700 text-xs font-semibold rounded-full">
+                                {{ ucfirst($currentQuestion['type']) }}
+                            </span>
                         </div>
 
-                        <!-- Navigation Buttons -->
-                        <div class="flex items-center justify-between mt-8 pt-6 border-t">
-                            <button wire:click="previousLesson"
-                                class="px-6 py-3 bg-gray-200 hover:bg-gray-300 text-gray-700 rounded-lg font-medium transition-colors flex items-center space-x-2 {{ !$hasPreviousLesson ? 'opacity-50 cursor-not-allowed' : '' }}"
-                                {{ !$hasPreviousLesson ? 'disabled' : '' }}>
-                                <i data-lucide="chevron-left" class="h-4 w-4"></i>
-                                <span>Previous</span>
+                        <h3 class="text-xl font-bold text-gray-900 mb-6">
+                            {{ $currentQuestion['question_text'] }}
+                        </h3>
+
+                        <!-- Options -->
+                        <div class="space-y-3">
+                            @foreach ($currentQuestion['options'] as $option)
+                                <button wire:click="chooseOption({{ $currentIndex }}, {{ $option['id'] }})"
+                                    class="w-full text-left p-4 rounded-lg border-2 transition-all
+                                {{ ($answers[$currentIndex] ?? null) == $option['id']
+                                    ? 'border-primary bg-primary bg-opacity-10'
+                                    : 'border-gray-200 hover:border-gray-300' }}">
+                                    <div class="flex items-center">
+                                        <div
+                                            class="flex-shrink-0 w-6 h-6 rounded-full border-2 mr-3
+                                    {{ ($answers[$currentIndex] ?? null) == $option['id'] ? 'border-primary bg-primary' : 'border-gray-300' }}">
+                                            @if (($answers[$currentIndex] ?? null) == $option['id'])
+                                                <svg class="w-full h-full text-white p-1" fill="currentColor"
+                                                    viewBox="0 0 20 20">
+                                                    <path fill-rule="evenodd"
+                                                        d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
+                                                        clip-rule="evenodd" />
+                                                </svg>
+                                            @endif
+                                        </div>
+                                        <span class="text-gray-700">{{ $option['option_text'] }}</span>
+                                    </div>
+                                </button>
+                            @endforeach
+                        </div>
+                    </div>
+
+                    <!-- Navigation Buttons -->
+                    <div class="flex justify-between items-center">
+                        <button wire:click="prev" @if ($currentIndex === 0) disabled @endif
+                            class="px-6 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 disabled:opacity-50 disabled:cursor-not-allowed">
+                            Previous
+                        </button>
+
+                        @if ($currentIndex < count($questions) - 1)
+                            <button wire:click="next"
+                                class="px-6 py-2 bg-primary text-white rounded-lg hover:bg-primary-dark">
+                                Next
                             </button>
-
-                            @if ($hasNextLesson)
-                                <button wire:click="nextLesson"
-                                    class="px-6 py-3 bg-primary hover:bg-primary-hover text-white rounded-lg font-medium transition-colors flex items-center space-x-2">
-                                    <span>Next</span>
-                                    <i data-lucide="chevron-right" class="h-4 w-4"></i>
-                                </button>
-                            @else
-                                <button wire:click="completeCourse"
-                                    class="px-6 py-3 bg-green-600 hover:bg-green-700 text-white rounded-lg font-medium transition-colors flex items-center space-x-2">
-                                    <span>Complete Course</span>
-                                    <i data-lucide="check-circle" class="h-4 w-4"></i>
-                                </button>
-                            @endif
-                        </div>
-                    @else
-                        <div class="text-center py-12">
-                            <i data-lucide="book-open" class="h-16 w-16 text-gray-300 mx-auto mb-4"></i>
-                            <h2 class="text-xl font-semibold text-gray-600 mb-2">Selamat Datang di Kursus</h2>
-                            <p class="text-gray-500">Pilih materi dari sidebar untuk mulai belajar</p>
-                        </div>
-                    @endif
+                        @else
+                            <button wire:click="submitQuiz"
+                                class="px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700">
+                                Submit Quiz
+                            </button>
+                        @endif
+                    </div>
                 </div>
-            </div>
+            @else
+                <div class="text-center py-12">
+                    <p class="text-gray-500">No questions available</p>
+                </div>
+            @endif
         </main>
 
         @if ($selectedLesson && $selectedLesson->quiz)
@@ -106,8 +173,8 @@
                             </div>
 
                             <button wire:click="startQuiz({{ $selectedLesson->quiz->id }})"
-                                class="px-6 py-3 bg-primary hover:bg-primary-hover text-white rounded-lg font-medium transition-colors inline-flex items-center space-x-2">
-                                 <i data-lucide="play-circle" class="h-5 w-5"></i>
+                                class="px-6 py-3 bg-primary hover:bg-primary-hover text-white rounded-lg">
+                                <i data-lucide="play-circle" class="h-5 w-5"></i>
                                 <span>Start Quiz</span>
                             </button>
                         </div>

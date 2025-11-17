@@ -95,6 +95,7 @@ Route::middleware(['auth', 'role.redirect', 'role:admin'])
 // STUDENT ROUTES
 // ======================
 use App\Livewire\Student\CourseStart; // jangan lupa import
+use App\Livewire\Student\Quiz;
 
 Route::middleware(['auth', 'role.redirect', 'role:student'])
     ->prefix('student')
@@ -105,5 +106,12 @@ Route::middleware(['auth', 'role.redirect', 'role:student'])
 
         // Route untuk mulai belajar
         Route::get('/course/{course}/start', CourseStart::class)->name('course.start');
-    });
 
+        // Start Quiz
+        Route::get('/quiz/{quizId}/start', Quiz::class)->name('quiz.start');
+
+        // Quiz Result
+        Route::get('/quiz/{quizId}/result', function ($quizId) {
+            return view('student.quiz-result', compact('quizId'));
+        })->name('quiz.result');
+    });
