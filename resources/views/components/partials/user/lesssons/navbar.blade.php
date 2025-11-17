@@ -1,3 +1,4 @@
+
 <!-- Top Navigation Bar -->
 <nav class="sticky top-0 z-50 w-full bg-white border-b shadow-sm">
     <div class="flex items-center justify-between px-4 py-3">
@@ -24,7 +25,7 @@
                 </div>
                 <span class="text-sm font-semibold text-primary">35%</span>
             </div>
-            <a href="course-detail.html"
+            <a href="#"
                 class="px-4 py-2 text-gray-700 hover:text-primary transition-colors font-medium">
                 <i data-lucide="x" class="h-5 w-5 inline"></i>
                 <span class="hidden sm:inline ml-1">Exit</span>

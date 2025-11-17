@@ -18,7 +18,7 @@ class Lesson extends Model
         'duration',
         'free_preview',
         'position',
-    ]; 
+    ];
 
     protected static function boot()
     {
@@ -33,4 +33,10 @@ class Lesson extends Model
     {
         return $this->belongsTo(Module::class);
     }
+
+    public function quiz()
+    {
+        return $this->hasOne(Quiz::class);
+    }
+
 }

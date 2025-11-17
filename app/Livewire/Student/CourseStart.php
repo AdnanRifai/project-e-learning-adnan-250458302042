@@ -3,234 +3,140 @@
 namespace App\Livewire\Student;
 
 use App\Models\Course;
-use App\Models\Enrollment;
 use App\Models\Lesson;
-use App\Models\Module;
-use Illuminate\Support\Facades\Auth;
+use Livewire\Attributes\Layout;
 use Livewire\Component;
 
+#[Layout('components.layouts.lessons')]
 class CourseStart extends Component
 {
-    public $courseSlug;
     public $course;
-    public $enrollment;
-    public $currentLesson;
     public $modules;
-    public $completedLessons = [];
-    public $sidebarOpen = true;
+    public $selectedLesson;
 
-    protected $queryString = ['lesson'];
-    public $lesson;
+    // Tambahkan property untuk navigation state
+    public $hasPreviousLesson = false;
+    public $hasNextLesson = false;
+    public $progressPercentage = 0;
 
-    public function mount($slug)
+    public function mount(Course $course)
     {
-        $this->courseSlug = $slug;
-
-        // Load course dengan relasi
-        $this->course = Course::where('slug', $slug)
-            ->with(['modules.lessons' => function($query) {
-                $query->orderBy('position');
-            }])
-            ->firstOrFail();
-
-        // Check enrollment
-        $this->enrollment = Enrollment::firstOrCreate([
-            'user_id' => Auth::id(),
-            'course_id' => $this->course->id,
-        ], [
-            'enrolled_at' => now(),
-            'progress' => 0,
+        // Load lengkap: course + modules + lessons
+        $this->course = $course->load([
+            'modules.lessons' => function ($q) {
+                $q->orderBy('position');
+            }
         ]);
 
-        // Load modules
-        $this->modules = $this->course->modules()
-            ->with('lessons')
-            ->orderBy('position')
-            ->get();
+        // Modules udah ada di $course, tinggal sort
+        $this->modules = $this->course->modules->sortBy('position');
 
-        // Load completed lessons dari session atau database
-        $this->loadCompletedLessons();
+        // Default: lesson pertama dari modul pertama
+        $this->selectedLesson = $this->modules->first()?->lessons()->with('quiz')->first();
 
-        // Set current lesson
-        if ($this->lesson) {
-            $this->loadLesson($this->lesson);
-        } else {
-            // Load first lesson jika tidak ada lesson yang dipilih
-            $this->loadFirstLesson();
-        }
+        // Update navigation state setelah set selectedLesson
+        $this->updateNavigationState();
     }
 
-    public function loadLesson($lessonId)
+    public function selectLesson($lessonId)
     {
-        $this->currentLesson = Lesson::with('module')->findOrFail($lessonId);
-        $this->lesson = $lessonId;
+        $lesson = Lesson::with('quiz')->find($lessonId);
 
-        // Update query string
-        $this->dispatch('lessonChanged', $this->currentLesson->id);
-    }
-
-    public function loadFirstLesson()
-    {
-        $firstModule = $this->modules->first();
-        if ($firstModule && $firstModule->lessons->count() > 0) {
-            $this->currentLesson = $firstModule->lessons->first();
-            $this->lesson = $this->currentLesson->id;
-        }
-    }
-
-    public function markComplete()
-    {
-        if (!$this->currentLesson) {
+        if (!$lesson || $lesson->module->course_id !== $this->course->id) {
             return;
         }
 
-        // Tambahkan ke completed lessons
-        if (!in_array($this->currentLesson->id, $this->completedLessons)) {
-            $this->completedLessons[] = $this->currentLesson->id;
+        $this->selectedLesson = $lesson;
+        $this->updateNavigationState();
 
-            // Simpan ke session atau database
-            session()->put('completed_lessons_' . $this->course->id, $this->completedLessons);
+        $this->dispatch('lessonSelected');
+    }
 
-            // Update progress
-            $this->updateProgress();
 
-            $this->dispatch('lesson-completed', $this->currentLesson->id);
-            $this->dispatch('notify', [
-                'type' => 'success',
-                'message' => 'Lesson marked as complete!'
-            ]);
+    public function previousLesson()
+    {
+        $allLessons = $this->getAllLessons();
+        $currentIndex = $allLessons->search(function ($lesson) {
+            return $lesson->id === $this->selectedLesson->id;
+        });
+
+        if ($currentIndex > 0) {
+            $previousLesson = $allLessons[$currentIndex - 1];
+            $this->selectLesson($previousLesson->id);
         }
     }
 
     public function nextLesson()
     {
-        if (!$this->currentLesson) {
+        $allLessons = $this->getAllLessons();
+        $currentIndex = $allLessons->search(function ($lesson) {
+            return $lesson->id === $this->selectedLesson->id;
+        });
+
+        if ($currentIndex < $allLessons->count() - 1) {
+            $nextLesson = $allLessons[$currentIndex + 1];
+            $this->selectLesson($nextLesson->id);
+        }
+    }
+
+    public function completeCourse()
+    {
+        // Logic untuk menyelesaikan kursus
+        // Contoh: update progress user, redirect, dll.
+        return redirect()->route('courses.show', $this->course->id)
+            ->with('success', 'Kursus berhasil diselesaikan!');
+    }
+
+    // Method untuk update navigation state
+    private function updateNavigationState()
+    {
+        if (!$this->selectedLesson) {
+            $this->hasPreviousLesson = false;
+            $this->hasNextLesson = false;
             return;
         }
 
-        $currentModule = $this->currentLesson->module;
-        $lessons = $currentModule->lessons->sortBy('position');
-
-        $currentIndex = $lessons->search(function ($lesson) {
-            return $lesson->id === $this->currentLesson->id;
+        $allLessons = $this->getAllLessons();
+        $currentIndex = $allLessons->search(function ($lesson) {
+            return $lesson->id === $this->selectedLesson->id;
         });
 
-        // Check if there's a next lesson in current module
-        if ($currentIndex !== false && $currentIndex < $lessons->count() - 1) {
-            $nextLesson = $lessons->values()[$currentIndex + 1];
-            $this->loadLesson($nextLesson->id);
-        } else {
-            // Move to next module
-            $nextModule = $this->modules->where('position', '>', $currentModule->position)
-                ->sortBy('position')
-                ->first();
+        $this->hasPreviousLesson = $currentIndex > 0;
+        $this->hasNextLesson = $currentIndex < $allLessons->count() - 1;
 
-            if ($nextModule && $nextModule->lessons->count() > 0) {
-                $nextLesson = $nextModule->lessons->sortBy('position')->first();
-                $this->loadLesson($nextLesson->id);
-            } else {
-                $this->dispatch('notify', [
-                    'type' => 'info',
-                    'message' => 'You have reached the end of the course!'
-                ]);
-            }
-        }
+        // Update progress percentage
+        $this->updateProgressPercentage();
     }
 
-    public function previousLesson()
+    // Method untuk update progress
+    private function updateProgressPercentage()
     {
-        if (!$this->currentLesson) {
+        $totalLessons = $this->getAllLessons()->count();
+
+        if ($totalLessons === 0) {
+            $this->progressPercentage = 0;
             return;
         }
 
-        $currentModule = $this->currentLesson->module;
-        $lessons = $currentModule->lessons->sortBy('position');
-
-        $currentIndex = $lessons->search(function ($lesson) {
-            return $lesson->id === $this->currentLesson->id;
+        // Contoh sederhana: progress berdasarkan lesson yang sedang dilihat
+        $allLessons = $this->getAllLessons();
+        $currentIndex = $allLessons->search(function ($lesson) {
+            return $lesson->id === $this->selectedLesson->id;
         });
 
-        // Check if there's a previous lesson in current module
-        if ($currentIndex !== false && $currentIndex > 0) {
-            $prevLesson = $lessons->values()[$currentIndex - 1];
-            $this->loadLesson($prevLesson->id);
-        } else {
-            // Move to previous module
-            $prevModule = $this->modules->where('position', '<', $currentModule->position)
-                ->sortByDesc('position')
-                ->first();
-
-            if ($prevModule && $prevModule->lessons->count() > 0) {
-                $prevLesson = $prevModule->lessons->sortByDesc('position')->first();
-                $this->loadLesson($prevLesson->id);
-            } else {
-                $this->dispatch('notify', [
-                    'type' => 'info',
-                    'message' => 'You are at the first lesson!'
-                ]);
-            }
-        }
+        // Progress = (index lesson saat ini + 1) / total lessons * 100
+        $this->progressPercentage = round((($currentIndex + 1) / $totalLessons) * 100);
     }
 
-    public function toggleSidebar()
+    private function getAllLessons()
     {
-        $this->sidebarOpen = !$this->sidebarOpen;
-    }
-
-    public function isLessonCompleted($lessonId)
-    {
-        return in_array($lessonId, $this->completedLessons);
-    }
-
-    public function isCurrentLesson($lessonId)
-    {
-        return $this->currentLesson && $this->currentLesson->id === $lessonId;
-    }
-
-    private function loadCompletedLessons()
-    {
-        // Load dari session (bisa diganti dengan database)
-        $this->completedLessons = session()->get('completed_lessons_' . $this->course->id, []);
-    }
-
-    private function updateProgress()
-    {
-        $totalLessons = $this->modules->sum(function ($module) {
-            return $module->lessons->count();
-        });
-
-        if ($totalLessons > 0) {
-            $progress = (count($this->completedLessons) / $totalLessons) * 100;
-
-            $this->enrollment->update([
-                'progress' => round($progress, 2)
-            ]);
-
-            // Check if completed
-            if ($progress >= 100) {
-                $this->enrollment->update([
-                    'completed_at' => now()
-                ]);
-            }
-        }
-    }
-
-    public function getTotalLessonsProperty()
-    {
-        return $this->modules->sum(function ($module) {
-            return $module->lessons->count();
-        });
-    }
-
-    public function getTotalDurationProperty()
-    {
-        return $this->modules->sum(function ($module) {
-            return $module->lessons->sum('duration');
+        return $this->modules->flatMap(function ($module) {
+            return $module->lessons;
         });
     }
 
     public function render()
     {
-        return view('livewire.course-start');
+        return view('livewire.student.course-start');
     }
 }
