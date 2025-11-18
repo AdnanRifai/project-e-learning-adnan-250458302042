@@ -13,6 +13,9 @@ class CourseStart extends Component
     public $course;
     public $modules;
     public $selectedLesson;
+    public $questions = [];
+    public $currentIndex = 0; // Add this property
+    public $answers = []; // Add this property
 
     // Tambahkan property untuk navigation state
     public $hasPreviousLesson = false;
@@ -25,14 +28,17 @@ class CourseStart extends Component
         $this->course = $course->load([
             'modules.lessons' => function ($q) {
                 $q->orderBy('position');
-            }
+            },
         ]);
 
         // Modules udah ada di $course, tinggal sort
         $this->modules = $this->course->modules->sortBy('position');
 
         // Default: lesson pertama dari modul pertama
-        $this->selectedLesson = $this->modules->first()?->lessons()->with('quiz')->first();
+        $this->selectedLesson = $this->modules->flatMap->lessons->filter(fn($lesson) => $lesson->quiz)->first();
+
+        // Load questions if lesson has quiz
+        $this->loadQuestions();
 
         // Update navigation state setelah set selectedLesson
         $this->updateNavigationState();
@@ -40,18 +46,66 @@ class CourseStart extends Component
 
     public function selectLesson($lessonId)
     {
-        $lesson = Lesson::with('quiz')->find($lessonId);
+        $lesson = Lesson::with('quiz.questions')->find($lessonId);
 
         if (!$lesson || $lesson->module->course_id !== $this->course->id) {
             return;
         }
 
         $this->selectedLesson = $lesson;
+        $this->loadQuestions();
+        $this->resetQuizState(); // Reset quiz state when changing lessons
         $this->updateNavigationState();
 
         $this->dispatch('lessonSelected');
     }
 
+    // Add method to load questions
+    private function loadQuestions()
+    {
+        if ($this->selectedLesson && $this->selectedLesson->quiz) {
+            $this->questions = $this->selectedLesson->quiz->questions ?? [];
+        } else {
+            $this->questions = [];
+        }
+    }
+
+    // Add method to reset quiz state
+    private function resetQuizState()
+    {
+        $this->currentIndex = 0;
+        $this->answers = [];
+    }
+
+    // Add method to navigate between questions
+    public function goToQuestion($index)
+    {
+        if ($index >= 0 && $index < count($this->questions)) {
+            $this->currentIndex = $index;
+        }
+    }
+
+    // Add method to go to next question
+    public function nextQuestion()
+    {
+        if ($this->currentIndex < count($this->questions) - 1) {
+            $this->currentIndex++;
+        }
+    }
+
+    // Add method to go to previous question
+    public function previousQuestion()
+    {
+        if ($this->currentIndex > 0) {
+            $this->currentIndex--;
+        }
+    }
+
+    // Add method to save answer
+    public function saveAnswer($questionIndex, $answer)
+    {
+        $this->answers[$questionIndex] = $answer;
+    }
 
     public function previousLesson()
     {
@@ -83,8 +137,7 @@ class CourseStart extends Component
     {
         // Logic untuk menyelesaikan kursus
         // Contoh: update progress user, redirect, dll.
-        return redirect()->route('courses.show', $this->course->id)
-            ->with('success', 'Kursus berhasil diselesaikan!');
+        return redirect()->route('courses.show', $this->course->id)->with('success', 'Kursus berhasil diselesaikan!');
     }
 
     // Method untuk update navigation state
@@ -137,8 +190,14 @@ class CourseStart extends Component
 
     public function startQuiz($quizId)
     {
+        if (!$quizId) {
+            $this->dispatch('toast', ['type' => 'error', 'message' => 'Quiz not available']);
+            return;
+        }
+
         return redirect()->route('student.quiz.start', $quizId);
     }
+
     public function render()
     {
         return view('livewire.student.course-start');

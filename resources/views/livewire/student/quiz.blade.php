@@ -268,7 +268,7 @@
                         class="px-4 py-2 text-gray-700 hover:bg-gray-100 rounded-lg font-medium transition-colors">
                         Cancel
                     </button>
-                    <a href="{{ route('student.course.start', $quiz->lesson->course_id ?? 1) }}"
+                    <a href="{{ route('student.course.start', $quiz->lesson->module_id ?? 1) }}"
                         class="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg font-medium transition-colors">
                         Exit Quiz
                     </a>

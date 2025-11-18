@@ -36,7 +36,7 @@
                 <a wire:navigate class="nav-link" href="{{ route('admin.question.index') }}"><i class="fas fa-question-circle"></i>
                     <span>Questions</span></a>
             </li>
-
+            <li>
             <li class="menu-header">Community</li>
             <li>
                 <a wire:navigate class="nav-link" href="{{ route('admin.comments.index') }}"><i class="fas fa-comments"></i>

@@ -100,6 +100,13 @@ class Quiz extends Component
         return redirect()->route('student.quiz.result', $this->quizId);
     }
 
+    public function hydrate()
+    {
+        $this->questions ??= [];
+        $this->answers ??= [];
+    }
+
+
     public function render()
     {
         return view('livewire.student.quiz');

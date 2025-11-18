@@ -13,10 +13,14 @@ use App\Livewire\Admin\Lesson\LessonEdit;
 use App\Livewire\Admin\Module\ModuleCreate;
 use App\Livewire\Admin\Module\ModuleEdit;
 use App\Livewire\Admin\Module\ModuleShow;
+use App\Livewire\Admin\Option\OptionCreate;
+use App\Livewire\Admin\Option\OptionEdit;
+use App\Livewire\Admin\Option\OptionIndex;
 use App\Livewire\Admin\Statistics\StatisticsIndex;
 use App\Livewire\Admin\Profile\ProfileEdit;
 use App\Livewire\Admin\Question\QuestionCreate;
 use App\Livewire\Admin\Question\QuestionEdit;
+use App\Livewire\Admin\Question\QuestionShow;
 use App\Livewire\Admin\Quizes\QuizCreate;
 use App\Livewire\Admin\Quizes\QuizEdit;
 use App\Livewire\Admin\Quizes\QuizIndex;
@@ -28,6 +32,7 @@ use Illuminate\Support\Facades\Route;
 use App\Livewire\HomePage;
 use App\Livewire\Student\CourseDetail;
 use App\Livewire\Student\Dashboard;
+use App\Models\Option;
 
 Route::get('/', HomePage::class)->name('home');
 Route::get('/courses', CoursePage::class)->name('course');
@@ -80,6 +85,9 @@ Route::middleware(['auth', 'role.redirect', 'role:admin'])
         Route::get('/questions', QuestionIndex::class)->name('question.index');
         Route::get('/questions/create', QuestionCreate::class)->name('question.create');
         Route::get('/questions/{question}/edit', QuestionEdit::class)->name('question.edit');
+        Route::get('/questions/{question}', QuestionShow::class)
+            ->name('question.show');
+
 
         // Comments
         Route::get('/comments', CommentIndex::class)->name('comments.index');

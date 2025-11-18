@@ -27,6 +27,8 @@
                         <a href="{{ route('admin.question.edit', $question->id) }}"
                             class="btn btn-warning btn-sm">Edit</a>
                         <button wire:click="delete({{ $question->id }})" class="btn btn-danger btn-sm">Delete</button>
+                        <a href="{{ route('admin.question.show', $question->id) }}"
+                            class="btn btn-info btn-sm">View</a>
                     </td>
                 </tr>
             @endforeach
