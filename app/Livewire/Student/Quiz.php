@@ -4,7 +4,9 @@ namespace App\Livewire\Student;
 
 use Livewire\Component;
 use App\Models\Quiz as QuizModel;
+use App\Models\Answer;
 use Livewire\Attributes\Layout;
+use Illuminate\Support\Facades\Auth;
 
 #[Layout('components.layouts.master')]
 class Quiz extends Component
@@ -12,8 +14,8 @@ class Quiz extends Component
     public $quizId;
     public $quiz;
     public $questions = [];
+    public $answers = []; // Array untuk menyimpan semua jawaban [questionIndex => optionId]
     public $currentIndex = 0;
-    public $answers = [];
     public $courseId;
 
     public function mount($quizId)
@@ -21,28 +23,75 @@ class Quiz extends Component
         $this->quizId = $quizId;
         $this->quiz = QuizModel::with('questions.options')->findOrFail($quizId);
 
-        // Convert to array untuk digunakan di view
-        $this->questions = $this->quiz->questions->map(function($question) {
+        // Convert questions to simple array
+        $this->questions = $this->quiz->questions->map(function($q){
             return [
-                'id' => $question->id,
-                'question_text' => $question->question_text,
-                'type' => $question->type,
-                'options' => $question->options->map(function($option) {
+                'id' => $q->id,
+                'question_text' => $q->question_text,
+                'type' => $q->type,
+                'options' => $q->options->map(function($o){
                     return [
-                        'id' => $option->id,
-                        'option_text' => $option->option_text,
-                        'is_correct' => $option->is_correct
+                        'id' => $o->id,
+                        'option_text' => $o->option_text,
+                        'is_correct' => $o->is_correct,
                     ];
                 })->toArray()
             ];
         })->toArray();
 
-        // Initialize answers array
-        foreach ($this->questions as $idx => $q) {
-            $this->answers[$idx] = null;
+        // Load semua jawaban yang sudah tersimpan
+        $this->loadAllAnswers();
+    }
+
+    // =====================================================================================
+    // LOAD SEMUA JAWABAN DARI DB
+    // =====================================================================================
+    public function loadAllAnswers()
+    {
+        $savedAnswers = Answer::where('user_id', Auth::id())
+            ->where('quiz_id', $this->quizId)
+            ->get()
+            ->keyBy('question_id');
+
+        // Map jawaban ke index array berdasarkan question_id
+        foreach ($this->questions as $index => $question) {
+            if (isset($savedAnswers[$question['id']])) {
+                $this->answers[$index] = $savedAnswers[$question['id']]->option_id;
+            } else {
+                $this->answers[$index] = null;
+            }
         }
     }
 
+    // =====================================================================================
+    // PILIH OPSI DAN SIMPAN LANGSUNG KE DB
+    // =====================================================================================
+    public function chooseOption($questionIndex, $optionId)
+    {
+        // Update state lokal
+        $this->answers[$questionIndex] = $optionId;
+
+        // Simpan langsung ke database
+        $questionId = $this->questions[$questionIndex]['id'];
+
+        Answer::updateOrCreate(
+            [
+                'user_id' => Auth::id(),
+                'quiz_id' => $this->quizId,
+                'question_id' => $questionId,
+            ],
+            [
+                'option_id' => $optionId
+            ]
+        );
+
+        // Optional: Tampilkan notifikasi sukses (bisa dihapus jika tidak perlu)
+        $this->dispatch('answer-saved');
+    }
+
+    // =====================================================================================
+    // GO TO SPECIFIC QUESTION
+    // =====================================================================================
     public function goToQuestion($index)
     {
         if ($index >= 0 && $index < count($this->questions)) {
@@ -50,6 +99,9 @@ class Quiz extends Component
         }
     }
 
+    // =====================================================================================
+    // NEXT QUESTION
+    // =====================================================================================
     public function next()
     {
         if ($this->currentIndex < count($this->questions) - 1) {
@@ -57,6 +109,9 @@ class Quiz extends Component
         }
     }
 
+    // =====================================================================================
+    // PREVIOUS QUESTION
+    // =====================================================================================
     public function prev()
     {
         if ($this->currentIndex > 0) {
@@ -64,48 +119,42 @@ class Quiz extends Component
         }
     }
 
-    public function chooseOption($questionIndex, $optionId)
-    {
-        $this->answers[$questionIndex] = $optionId;
-    }
-
+    // =====================================================================================
+    // SUBMIT QUIZ (MENGHITUNG NILAI)
+    // =====================================================================================
     public function submitQuiz()
     {
-        // Hitung skor
+        $userId = Auth::id();
+        $total = count($this->questions);
         $score = 0;
-        $totalQuestions = count($this->questions);
 
-        foreach ($this->questions as $idx => $question) {
-            // Cari jawaban yang benar
-            $correctOption = collect($question['options'])->firstWhere('is_correct', 1);
+        foreach ($this->questions as $q) {
+            $correctOption = collect($q['options'])->firstWhere('is_correct', 1);
 
-            // Cek apakah user jawab benar
-            if ($correctOption && $correctOption['id'] == ($this->answers[$idx] ?? null)) {
+            $userAnswer = Answer::where('user_id', $userId)
+                ->where('quiz_id', $this->quizId)
+                ->where('question_id', $q['id'])
+                ->first();
+
+            if ($correctOption && $userAnswer && $userAnswer->option_id == $correctOption['id']) {
                 $score++;
             }
         }
 
-        // Hitung persentase
-        $percentage = ($score / $totalQuestions) * 100;
+        $percentage = ($score / $total) * 100;
 
-        // Simpan hasil ke session
         session()->flash('quiz_result', [
             'score' => $score,
-            'total' => $totalQuestions,
+            'total' => $total,
             'percentage' => round($percentage, 2),
             'passed' => $percentage >= $this->quiz->passing_score
         ]);
 
-        // Redirect ke halaman hasil
-        return redirect()->route('student.quiz.result', $this->quizId);
+        return redirect()->route('student.quiz.result', [
+            'quizId' => $this->quizId,
+            'userId' => $userId
+        ]);
     }
-
-    public function hydrate()
-    {
-        $this->questions ??= [];
-        $this->answers ??= [];
-    }
-
 
     public function render()
     {

@@ -85,9 +85,7 @@ Route::middleware(['auth', 'role.redirect', 'role:admin'])
         Route::get('/questions', QuestionIndex::class)->name('question.index');
         Route::get('/questions/create', QuestionCreate::class)->name('question.create');
         Route::get('/questions/{question}/edit', QuestionEdit::class)->name('question.edit');
-        Route::get('/questions/{question}', QuestionShow::class)
-            ->name('question.show');
-
+        Route::get('/questions/{question}', QuestionShow::class)->name('question.show');
 
         // Comments
         Route::get('/comments', CommentIndex::class)->name('comments.index');
@@ -104,6 +102,7 @@ Route::middleware(['auth', 'role.redirect', 'role:admin'])
 // ======================
 use App\Livewire\Student\CourseStart; // jangan lupa import
 use App\Livewire\Student\Quiz;
+use App\Livewire\Student\QuizResult;
 
 Route::middleware(['auth', 'role.redirect', 'role:student'])
     ->prefix('student')
@@ -119,7 +118,5 @@ Route::middleware(['auth', 'role.redirect', 'role:student'])
         Route::get('/quiz/{quizId}/start', Quiz::class)->name('quiz.start');
 
         // Quiz Result
-        Route::get('/quiz/{quizId}/result', function ($quizId) {
-            return view('student.quiz-result', compact('quizId'));
-        })->name('quiz.result');
+        Route::get('/quiz/{quizId}/{userId}/result', QuizResult::class)->name('quiz.result');
     });

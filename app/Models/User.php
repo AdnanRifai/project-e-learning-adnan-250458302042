@@ -35,4 +35,10 @@ class User extends Authenticatable
     {
         return $this->hasMany(StudentProgress::class);
     }
+
+    public function answers()
+    {
+        return $this->hasMany(Answer::class);
+    }
+
 }
